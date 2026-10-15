@@ -1,0 +1,21 @@
+<!doctype html><html lang=es><meta charset=utf-8><meta name=viewport content="width=device-width,initial-scale=1"><link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;900&display=swap" rel=stylesheet><link rel=stylesheet href=/assets/app.css>
+<title>Matriz de requisiciones</title><style>@page{size:landscape}</style>
+<header class=top id=h></header>
+<main><div class=ticket>
+<div class=hero><div><h1>Matriz de requisiciones</h1><span id=sub></span></div><div class="noprint bar" style="padding:0"><a class="btn gh" href="/">+ Nueva</a><button class=btn onclick="pdf('Matriz-requisiciones')">Exportar PDF</button></div></div>
+<div class=kp id=kp></div>
+<div class="g noprint"><label>Buscar<input id=q placeholder="Folio, solicitante, destino…"></label><label>Estatus<select id=fs></select></label></div>
+<div class=pad><table><thead><tr><th>Folio<th>Fecha<th>Solicitante<th>Destino<th>Periodo<th>Pers.<th>Días<th class=r>Total<th>Estatus<th class=noprint></tr></thead><tbody id=tb></tbody></table></div>
+<p style="padding:0 24px;color:var(--mut)" id=emp></p>
+</div></main><script src=/assets/app.js></script><script>
+shell(1);let L=[];
+$('#fs').innerHTML='<option value="">Todos</option>'+O(ST);
+function draw(){const q=$('#q').value.toLowerCase(),f=$('#fs').value;
+const v=L.filter(r=>(!f||r.estatus==f)&&JSON.stringify([r.id,r.solicitante,r.destino,r.motivo]).toLowerCase().includes(q));
+$('#sub').textContent=v.length+' requisiciones · '+new Date().toLocaleDateString('es-MX');
+$('#kp').innerHTML=ST.map(s=>`<div style="border-color:${COL[s]}"><b>${v.filter(r=>r.estatus==s).length}</b>${s}</div>`).join('')+`<div style="border-color:var(--ink)"><b>${money(v.reduce((a,r)=>a+(r.total||0),0))}</b>Total</div>`;
+$('#tb').innerHTML=v.map(r=>`<tr><td><b>${r.id}</b><td>${r.fecha||''}<td>${r.solicitante||''}<td>${r.destino||''}<td>${r.salida||''} → ${r.regreso||''}<td>${r.personas}<td>${r.dias}<td class=r>${money(r.total)}<td><select data-id="${r.id}" style="color:${COL[r.estatus]};font-weight:700">${O(ST,r.estatus)}</select><td class=noprint><a href="/?id=${r.id}">Abrir</a><a href="/comprobacion.html?req=${r.id}">Comprobar</a></tr>`).join('');
+$('#emp').textContent=v.length?'':'Sin requisiciones todavía.'}
+document.addEventListener('input',async e=>{const t=e.target;if(t.dataset.id){const r=L.find(x=>x.id==t.dataset.id);r.estatus=t.value;try{await api('requisiciones','POST',r);toast('Estatus actualizado ✓')}catch{toast('Error')}draw()}else draw()});
+api('requisiciones').then(a=>{L=a.sort((x,y)=>(y.fecha||'').localeCompare(x.fecha||''));draw()}).catch(()=>toast('No se pudo cargar'));
+</script>

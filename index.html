@@ -1,0 +1,32 @@
+<!doctype html><html lang=es><meta charset=utf-8><meta name=viewport content="width=device-width,initial-scale=1"><link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;900&display=swap" rel=stylesheet><link rel=stylesheet href=/assets/app.css>
+<title>Requisición de viáticos</title>
+<header class=top id=h></header>
+<main><div class=ticket>
+<div class=hero><div><h1>Requisición de viáticos</h1><span>Folio <b id=folio></b></span></div><span class=pill id=pst></span></div>
+<div class=g><label>Fecha<input type=date name=fecha></label><label>Solicitante<input name=solicitante></label><label>Puesto<input name=puesto></label><label>Proyecto / motivo<input name=motivo></label></div>
+<div class=route><label>Origen<input name=origen></label><i>🚚</i><label>Destino<input name=destino></label></div>
+<div class=g><label>Salida<input type=date name=salida></label><label>Regreso<input type=date name=regreso></label><label>Personas<input type=number min=1 name=personas></label><label>Días<input type=number min=1 name=dias></label></div>
+<div class=pad><table><thead><tr><th>Concepto<th>Tarifa (MXN)<th>Base de cálculo<th class=r>Subtotal<th class=noprint></tr></thead><tbody id=tb></tbody>
+<tfoot><tr><td colspan=3 class=r>TOTAL A REQUERIR<td class=r id=tot><td class=noprint></tr></tfoot></table>
+<button class="btn gh noprint" id=add>+ Agregar concepto</button></div>
+<div class=g><label>Observaciones<textarea name=obs rows=2></textarea></label><label class=noprint>Estatus<select name=estatus></select></label></div>
+<div class=sig><div>Solicitante</div><div>Jefe de área</div><div>Finanzas / Autorización</div></div>
+<div class="bar noprint"><button class="btn gh" onclick="location='/'">Nueva</button><button class="btn alt" id=save>Guardar</button><button class=btn id=pdfb>Exportar PDF</button></div>
+</div></main><script src=/assets/app.js></script><script>
+shell(0);
+const BS={pd:'Persona / día',p:'Por persona',d:'Por día',f:'Monto fijo'};
+let r={id:uid('VIA'),fecha:today(),personas:1,dias:1,estatus:'Borrador',items:[['Hospedaje','pd'],['Alimentos','pd'],['Transporte local','pd'],['Casetas','f'],['Combustible','f'],['Otros','f']].map(([c,b])=>({c,t:0,b}))};
+const sub=i=>i.t*(/p/.test(i.b)?r.personas:1)*(/d/.test(i.b)?r.dias:1);
+const total=()=>r.items.reduce((a,i)=>a+sub(i),0);
+function calc(){$$('.sub').forEach((e,n)=>e.textContent=money(sub(r.items[n])));$('#tot').textContent=money(total());$('#pst').textContent=r.estatus;$('#pst').style.background=COL[r.estatus]}
+function draw(){$('#tb').innerHTML=r.items.map((i,n)=>`<tr><td><input data-n=${n} data-f=c value="${i.c}"><td><input type=number min=0 step=.01 data-n=${n} data-f=t value=${i.t}><td><select data-n=${n} data-f=b>${Object.entries(BS).map(([k,v])=>`<option value=${k} ${k==i.b?'selected':''}>${v}</option>`).join('')}</select><td class="r sub"><td class=noprint><button class=x data-del=${n}>×</button></tr>`).join('');calc()}
+function fill(){$('#folio').textContent=r.id;$$('[name]').forEach(e=>e.value=r[e.name]??'');draw()}
+$('[name=estatus]').innerHTML=O(ST);
+function dias(){if(r.salida&&r.regreso){const d=(new Date(r.regreso)-new Date(r.salida))/864e5+1;if(d>0){r.dias=d;$('[name=dias]').value=d}}}
+document.addEventListener('input',e=>{const t=e.target,d=t.dataset;if(d.f)r.items[d.n][d.f]=d.f=='t'?+t.value:t.value;else if(t.name){r[t.name]=t.type=='number'?+t.value:t.value;if(/salida|regreso/.test(t.name))dias()}calc()});
+document.addEventListener('click',e=>{const n=e.target.dataset.del;if(n!=null){r.items.splice(n,1);draw()}});
+$('#add').onclick=()=>{r.items.push({c:'',t:0,b:'f'});draw()};
+$('#save').onclick=async()=>{r.total=total();try{await api('requisiciones','POST',r);history.replaceState(0,'','/?id='+r.id);toast('Requisición guardada ✓')}catch{toast('Error al guardar')}};
+$('#pdfb').onclick=()=>pdf('Requisicion-'+r.id);
+(async()=>{if(qs('id')){try{r=await api('requisiciones','GET',0,qs('id'))||r}catch{}}fill()})();
+</script>

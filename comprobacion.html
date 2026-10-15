@@ -1,0 +1,32 @@
+<!doctype html><html lang=es><meta charset=utf-8><meta name=viewport content="width=device-width,initial-scale=1"><link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;900&display=swap" rel=stylesheet><link rel=stylesheet href=/assets/app.css>
+<title>Comprobación de gastos</title>
+<header class=top id=h></header>
+<main><div class=ticket>
+<div class=hero><div><h1>Comprobación de gastos</h1><span id=sub>Selecciona una requisición</span></div><span class=pill id=pst></span></div>
+<div class=g><label class=noprint>Requisición<select id=rs></select></label><label>Solicitante<input id=sol readonly></label><label>Destino · periodo<input id=dst readonly></label><label>Anticipo recibido<input type=number min=0 step=.01 id=ant></label></div>
+<div class=pad><table><thead><tr><th>Fecha<th>Concepto<th>Proveedor<th>Comprobante<th>Folio / UUID<th class=r>Monto<th class=noprint></tr></thead><tbody id=tb></tbody></table>
+<button class="btn gh noprint" id=add>+ Agregar gasto</button></div>
+<div class=sum><div>Anticipo<b id=sa></b></div><div>Comprobado<b id=sc></b></div><div>Sin comprobante<b id=sn></b></div><div class=hl><span id=sl></span><b id=sd></b></div></div>
+<div class=g><label>Observaciones<textarea id=obs rows=2></textarea></label></div>
+<div class=sig><div>Solicitante</div><div>Jefe de área</div><div>Finanzas / Autorización</div></div>
+<div class="bar noprint"><button class="btn alt" id=save>Guardar comprobación</button><button class=btn id=pdfb>Exportar PDF</button></div>
+</div></main><script src=/assets/app.js></script><script>
+shell(2);const CO=['Hospedaje','Alimentos','Transporte','Casetas','Combustible','Otros'],CP=['Factura','Ticket','Recibo','Sin comprobante'];
+let R=[],r=null,c={gastos:[]};
+const tot=()=>c.gastos.reduce((a,g)=>a+(+g.m||0),0);
+function calc(){const t=tot(),d=(+c.anticipo||0)-t;$('#sa').textContent=money(c.anticipo);$('#sc').textContent=money(t);
+$('#sn').textContent=money(c.gastos.filter(g=>g.k=='Sin comprobante').reduce((a,g)=>a+(+g.m||0),0));
+$('#sl').textContent=d>=0?'Reintegro a la empresa':'Saldo a favor del empleado';$('#sd').textContent=money(Math.abs(d))}
+function draw(){$('#tb').innerHTML=c.gastos.map((g,n)=>`<tr><td><input type=date data-n=${n} data-f=f value="${g.f||''}"><td><select data-n=${n} data-f=c>${O(CO,g.c)}</select><td><input data-n=${n} data-f=p value="${g.p||''}"><td><select data-n=${n} data-f=k>${O(CP,g.k)}</select><td><input data-n=${n} data-f=fo value="${g.fo||''}"><td><input class=r type=number min=0 step=.01 data-n=${n} data-f=m value=${g.m||0}><td class=noprint><button class=x data-del=${n}>×</button></tr>`).join('');calc()}
+async function pick(id){r=R.find(x=>x.id==id);if(!r)return;$('#rs').value=id;
+c=(await api('comprobaciones','GET',0,'C-'+id).catch(()=>0))||{id:'C-'+id,reqId:id,anticipo:r.total||0,gastos:[{f:today(),c:'Alimentos',k:'Factura',m:0}]};
+$('#sub').textContent='Folio '+id;$('#sol').value=r.solicitante||'';$('#dst').value=`${r.destino||''} · ${r.salida||''} → ${r.regreso||''}`;$('#ant').value=c.anticipo;$('#obs').value=c.obs||'';
+$('#pst').textContent=r.estatus;$('#pst').style.background=COL[r.estatus];draw()}
+document.addEventListener('input',e=>{const t=e.target,d=t.dataset;if(d.f)c.gastos[d.n][d.f]=t.value;else if(t.id=='ant')c.anticipo=+t.value;else if(t.id=='obs')c.obs=t.value;else if(t.id=='rs')return pick(t.value);calc()});
+document.addEventListener('click',e=>{const n=e.target.dataset.del;if(n!=null){c.gastos.splice(n,1);draw()}});
+$('#add').onclick=()=>{if(r){c.gastos.push({f:today(),c:'Otros',k:'Factura',m:0});draw()}};
+$('#save').onclick=async()=>{if(!r)return toast('Selecciona una requisición');c.total=tot();c.fecha=today();r.estatus='Comprobada';
+try{await api('comprobaciones','POST',c);await api('requisiciones','POST',r);$('#pst').textContent='Comprobada';$('#pst').style.background=COL.Comprobada;toast('Comprobación guardada ✓')}catch{toast('Error al guardar')}};
+$('#pdfb').onclick=()=>pdf('Comprobacion-'+(r?r.id:''));
+api('requisiciones').then(a=>{R=a.filter(x=>x.estatus!='Rechazada');$('#rs').innerHTML='<option value="">Selecciona…</option>'+R.map(x=>`<option value="${x.id}">${x.id} · ${x.solicitante||''} · ${x.destino||''}</option>`).join('');if(qs('req'))pick(qs('req'))}).catch(()=>toast('No se pudo cargar'));
+</script>
